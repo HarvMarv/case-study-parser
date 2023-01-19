@@ -1,3 +1,5 @@
+package parser
+
 import cats._
 
 sealed trait Parser[A] {
@@ -51,13 +53,14 @@ sealed trait Parser[A] {
             case Failure(reason, input, start) => Failure(reason, input, start)
             case Success(result, input, offset) =>
               Success(f(result), input, offset)
-
           }
+
         case ParserFlatMap(source, f) =>
           loop(source, index) match {
             case Failure(reason, input, start)  => Failure(reason, input, start)
             case Success(result, input, offset) => loop(f(result), offset)
           }
+
         case ParserProduct(source, that) =>
           loop(source, index) match {
             case Failure(reason, input, start) => Failure(reason, input, start)
@@ -89,13 +92,6 @@ sealed trait Parser[A] {
               Success(result, input, offset)
           }
 
-        //         case ParserOrElse(source, that) =>
-//           loop(source, index) match {
-//             case Failure(reason, input, start) => loop(that, index)
-//             case Success(result, input, offset) =>
-//               Success(result, input, offset)
-//           }
-//       }
         case ParserRepeat(source, monoid) => {
           def repeatLoop(result: A, idx: Int): (A, Int) =
             loop(source, idx) match {
@@ -162,117 +158,3 @@ object Parser {
 
   val integer: Parser[Int] = digit.and(digit.repeat).map(str => str.toInt)
 }
-
-// /*
-//  * Copyright 2022 Creative Scala
-//  *
-//  * Licensed under the Apache License, Version 2.0 (the "License");
-//  * you may not use this file except in compliance with the License.
-//  * You may obtain a copy of the License at
-//  *
-//  *     http://www.apache.org/licenses/LICENSE-2.0
-//  *
-//  * Unless required by applicable law or agreed to in writing, software
-//  * distributed under the License is distributed on an "AS IS" BASIS,
-//  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  * See the License for the specific language governing permissions and
-//  * limitations under the License.
-//  */
-
-// package parser
-
-// import cats.Functor
-// import cats._
-// import cats.implicits._
-// import scala.annotation.tailrec
-
-// sealed trait Parser[A] {
-//   import Parser._
-
-//   def map[B](f: A => B): Parser[B] =
-//     ParserMap(this, f)
-
-//   def flatMap[B](f: A => Parser[B]): Parser[B] =
-//     ParserFlatMap(this, f)
-
-//   def product[B](that: Parser[B]): Parser[(A, B)] =
-//     ParserProduct(this, that)
-
-//   def orElse(that: => Parser[A]): Parser[A] =
-//     ParserOrElse(this, that)
-
-//   def parse(input: String): Result[A] = {
-//     def loop[A](parser: Parser[A], index: Int): Result[A] =
-//       parser match {
-//         case ParserMap(source, f) =>
-//           loop(source, index) match {
-//             case Failure(reason, input, start) => Failure(reason, input, start)
-//             case Success(result, input, offset) =>
-//               Success(f(result), input, offset)
-//           }
-
-//         case ParserString(value) =>
-//           if (input.startsWith(value, index))
-//             Success(value, input, index + value.size)
-//           else
-//             Failure(
-//               s"input did not start with $value at index $index",
-//               input,
-//               index
-//             )
-
-//         case ParserFail() => Failure("parser fail", input, index)
-//         case ParserProduct(source, that) =>
-//           loop(source, index) match {
-//             case Failure(reason, input, start) => Failure(reason, input, start)
-//             case Success(resultA, _, offset) =>
-//               loop(that, offset) match {
-//                 case Failure(reason, input, start) =>
-//                   Failure(reason, input, start)
-//                 case Success(resultB, input, offset) =>
-//                   Success((resultA, resultB), input, offset)
-//               }
-//           }
-
-//         case ParserFlatMap(source, f) =>
-//           loop(source, index) match {
-//             case Failure(reason, input, start) => Failure(reason, input, start)
-//             case Success(result, _, offset)    => loop(f(result), offset)
-//           }
-
-//         case ParserPure(value) => Success(value, input, index)
-
-//         case ParserOrElse(source, that) =>
-//           loop(source, index) match {
-//             case Failure(reason, input, start) => loop(that, index)
-//             case Success(result, input, offset) =>
-//               Success(result, input, offset)
-//           }
-//       }
-
-//     loop(this, 0)
-//   }
-// }
-// object Parser {
-//   def string(value: String): Parser[String] = ParserString(value)
-//   def pure[A](value: A): Parser[A] = ParserPure(value)
-//   def fail[A](): ParserFail[A] = ParserFail()
-
-//   final case class ParserString(value: String) extends Parser[String]
-//   final case class ParserMap[A, B](source: Parser[A], f: A => B)
-//       extends Parser[B]
-//   final case class ParserProduct[A, B](source: Parser[A], that: Parser[B])
-//       extends Parser[(A, B)]
-//   final case class ParserPure[A](value: A) extends Parser[A]
-//   final case class ParserFail[A]() extends Parser[A]
-//   final case class ParserFlatMap[A, B](source: Parser[A], f: A => Parser[B])
-//       extends Parser[B]
-//   final case class ParserOrElse[A](source: Parser[A], that: Parser[A])
-//       extends Parser[A]
-
-//   implicit val parserFunctorInstance: Functor[Parser] =
-//     new Functor[Parser] {
-//       override def map[A, B](fa: Parser[A])(f: A => B): Parser[B] =
-//         fa.map(f)
-//     }
-// }

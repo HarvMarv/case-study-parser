@@ -1,3 +1,4 @@
+package parser
 import cats.implicits._
 
 object Json extends App {
@@ -10,23 +11,23 @@ object Json extends App {
   final case class JsonBoolean(bool: Boolean) extends Json
   final case class JsonNull() extends Json
 
-  val jsonNull: Parser[Json] = Parser.string("null").map(_ => JsonNull())
+  def jsonNull: Parser[Json] = Parser.string("null").map(_ => JsonNull())
 
-  val jsonBool: Parser[Json] =
+  def jsonBool: Parser[Json] =
     Parser
       .string("true")
       .orElse(Parser.string("false"))
       .map(boolStr => JsonBoolean(if (boolStr == "true") true else false))
 
-  val digit: Parser[String] =
+  def digit: Parser[String] =
     List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9).foldLeft(Parser.fail[String]) {
       (parser, int) => parser.orElse(Parser.string(int.toString))
     }
 
-  val number: Parser[Json] =
+  def jsonNumber: Parser[Json] =
     digit.and(digit.repeat).map(n => JsonNumber(n.toInt))
 
-  val alphaLc =
+  def alphaLc =
     List(
       "a",
       "b",
@@ -55,53 +56,61 @@ object Json extends App {
       "y",
       "z"
     )
-  val alphaUc = alphaLc.map(_.toUpperCase())
-  val punctuation = List(" ", ",", ":", "!", ".", "?", ";", "'")
-  val stringMembers: Parser[String] =
-    (alphaLc ++ alphaUc ++ punctuation).foldLeft(Parser.fail[String]) {
-      (parser, char) =>
+  def alphaUc = alphaLc.map(_.toUpperCase())
+  def punctuation = List(" ", ",", ":", "!", ".", "?", ";", "'")
+  def stringMembers: Parser[String] =
+    (alphaLc ++ alphaUc ++ punctuation)
+      .foldLeft(Parser.fail[String]) { (parser, char) =>
         parser.orElse(Parser.string(char))
-    }
+      }
+      .orElse(digit)
 
-  val primitiveString: Parser[String] =
-    stringMembers.and(stringMembers.repeat)
-  val jsonString: Parser[Json] =
+  def primitiveString: Parser[String] =
+    stringMembers.repeat
+
+  def jsonString: Parser[Json] =
     (Parser.string("\""), primitiveString, Parser.string("\"")).mapN(
       (_, str, _) => JsonString(str)
     )
 
-  val whitespace: Parser[String] = Parser.string(" ").repeat
+  def whitespace: Parser[String] = Parser.string(" ").repeat
 
-  val value: Parser[Json] =
-    (whitespace *> jsonString
-      .orElse(number)
-      .orElse(jsonBool)
-      .orElse(jsonNull)
-      .orElse(jsonArray) <* whitespace)
+  def jsonValue: Parser[Json] =
+    (whitespace *>
+      jsonNumber
+        .orElse(jsonString)
+        .orElse(jsonBool)
+        .orElse(jsonNull)
+      // TODO: Fix array+Obj
+      // .orElse(jsonArray)
+      // .orElse(jsonObject)
+      <* whitespace)
 
-  val arrayItems: Parser[List[Json]] =
-    (value, Parser.string(","), Parser.delay(arrayItems))
+  def arrayItems: Parser[List[Json]] =
+    (jsonValue, Parser.string(","), Parser.delay(arrayItems))
       .mapN((f, _, e) => f :: e)
-      .orElse(value.map(List(_)))
+      .orElse(jsonValue.map(List(_)))
 
-  val jsonArray: Parser[Json] =
+  def jsonArray: Parser[Json] =
     (Parser.string("["), arrayItems, Parser.string("]")).mapN(
       (_, arrayItems, _) => JsonArray(arrayItems)
     )
 
-  val keyValuePair: Parser[(Json, Json)] =
-    (jsonString, Parser.string(":"), Parser.delay(value))
+  def keyValuePair: Parser[(Json, Json)] =
+    (jsonString, Parser.string(":"), Parser.delay(jsonValue))
       .mapN((k, _, v) => (k, v))
 
-  val objectMap: Parser[Map[Json, Json]] =
+  def objectMap: Parser[Map[Json, Json]] =
     (keyValuePair, Parser.string(","), Parser.delay(objectMap))
       .mapN((f, _, e) => Map(f._1 -> f._2) ++ e)
       .orElse(keyValuePair.map((x => Map(x._1 -> x._2))))
       // I added the possibility for whitespace to be the entire object (empty object)
-      .orElse(whitespace.map(Map()))
+      .orElse(whitespace.map(_ => Map[Json, Json]()))
 
-  val jsonObject: Parser[Json] =
+  def jsonObject: Parser[Json] =
     (Parser.string("{"), objectMap, Parser.string("}")).mapN(
       (_, objectMap, _) => JsonObject(objectMap)
     )
+
+  def rootJson: Parser[Json] = jsonObject.orElse(jsonArray)
 }

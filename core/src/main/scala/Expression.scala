@@ -1,6 +1,8 @@
+package parser
+
 import cats.implicits._
 
-object Expression extends App {
+object Expression {
   // 1 + x
   // 2 * 3
   // y + z
