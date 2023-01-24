@@ -81,15 +81,15 @@ object Json extends App {
         .orElse(jsonString)
         .orElse(jsonBool)
         .orElse(jsonNull)
-      // TODO: Fix array+Obj
-      // .orElse(jsonArray)
-      // .orElse(jsonObject)
+        .orElse(Parser.delay(jsonArray))
+        .orElse(Parser.delay(jsonObject))
       <* whitespace)
 
   def arrayItems: Parser[List[Json]] =
     (jsonValue, Parser.string(","), Parser.delay(arrayItems))
       .mapN((f, _, e) => f :: e)
       .orElse(jsonValue.map(List(_)))
+      .orElse(whitespace.map(_ => List()))
 
   def jsonArray: Parser[Json] =
     (Parser.string("["), arrayItems, Parser.string("]")).mapN(
